@@ -158,6 +158,15 @@ function _toAbsLength(base, value) {
 	return Number(value);
 }
 
+function _scaleRect(rect, scale) {
+	return {
+		x: rect.x * scale,
+		y: rect.y * scale,
+		width: rect.width * scale,
+		height: rect.height * scale
+	};
+}
+
 /**
  * A Javascript ScrollView module with pan and pinch support. Hammer.js is required. 
  */
@@ -196,6 +205,7 @@ var JScrollView = function () {
 
 		_classCallCheck(this, JScrollView);
 
+		options = options || {};
 		this._baseContentSize = null;
 		this._marginInPixel = null;
 		this._contentAdjust = { x: 0, y: 0 };
@@ -220,8 +230,8 @@ var JScrollView = function () {
 		var contentRoot = document.createElement('div');
 		contentRoot.id = '__jscrollview_root_';
 		contentRoot.style.position = 'absolute';
-		contentRoot.style.left = 0;
-		contentRoot.style.top = 0;
+		contentRoot.style.width = '100%';
+		contentRoot.style.height = '100%';
 		contentRoot.style.transformOrigin = "top left";
 		var children = container.children;
 		for (var i = 0; i < children.length; i++) {
@@ -737,11 +747,14 @@ var JScrollView = function () {
 	}, {
 		key: "_handleDoubleTap",
 		value: function _handleDoubleTap(evt) {
+
 			if (this._gestureDelegate.handleDoubleTap != null) {
 				if (this._gestureDelegate.handleDoubleTap(evt)) {
 					return;
 				}
 			}
+
+			if (this._lock) return;
 
 			if (this._zoomScale != 1.0) {
 				this.setContentOffsetAndZoomScale({ x: 0, y: 0 }, 1.0, true);
@@ -804,14 +817,13 @@ var JScrollView = function () {
 	}, {
 		key: "_handlePan",
 		value: function _handlePan(evt) {
-
 			if (this._gestureDelegate.handlePan != null) {
 				if (this._gestureDelegate.handlePan(evt)) {
 					return;
 				}
 			}
 
-			if (this._pinchStartZoomScale) return;
+			if (this._lock || this._pinchStartZoomScale) return;
 
 			if (evt.type == "panstart") {
 				this._panStartOffset = {
@@ -870,6 +882,8 @@ var JScrollView = function () {
 				}
 			}
 
+			if (this._lock) return;
+
 			if (evt.type == "pinchstart") {
 				this._pinchStartZoomScale = this._zoomScale;
 			} else if (evt.type == 'pinchmove') {
@@ -915,27 +929,37 @@ var JScrollView = function () {
 				height: currentRect.height * a
 			};
 
-			this.zoomTo(rect, animated);
+			this.zoomTo(rect, true, animated);
 		}
 
 		/**
    * Zooms to a specific area of the content so that it is visible in this view.
    * @param {Rectangle} rect A rectangle defining an area of the content. 
    *                         The rectangle should be in the coordinate space of the content.
+   * @param {boolean} limitOffset true to limit the content offset, false to not limit it.
    * @param {boolean} animated true to animate the transition, false to make it immediate.
    */
 
 	}, {
 		key: "zoomTo",
-		value: function zoomTo(rect, animated) {
+		value: function zoomTo(rect, limitOffset, animated) {
+
 			var scaleX = this._containerWidth / rect.width;
 			var scaleY = this._containerHeight / rect.height;
 			var newScale = Math.min(scaleX, scaleY);
-			var newOffset = this._limitContentOffset({
+			var newOffset = {
 				x: rect.x * newScale,
 				y: rect.y * newScale
-			}, false, newScale);
+			};
+			if (limitOffset) {
+				newOffset = this._limitContentOffset(newOffset, false, newScale);
+			}
 			this.setContentOffsetAndZoomScale(newOffset, newScale, animated);
+		}
+	}, {
+		key: "lock",
+		value: function lock(flag) {
+			this._lock = flag;
 		}
 	}]);
 
